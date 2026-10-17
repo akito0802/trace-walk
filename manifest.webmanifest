@@ -1,0 +1,19 @@
+{
+  "name": "TRACE — 歩くほど、街が深くなる",
+  "short_name": "TRACE",
+  "description": "散歩を、小さな冒険に。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101a2b",
+  "theme_color": "#101a2b",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
