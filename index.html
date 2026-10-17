@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#101a2b"><title>TRACE — 歩くほど、街が深くなる。</title>
+<meta name="theme-color" content="#101a2b"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" type="image/svg+xml" href="./icons/icon.svg"><title>TRACE — 歩くほど、街が深くなる。</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoz3TZ7+o0nK8=" crossorigin="">
 <style>
 :root{color-scheme:dark;--bg:#101a2b;--panel:#1d2a3d;--muted:#aebbc9;--gold:#c9aa72;--line:#354358;--white:#f6f3ed}
@@ -54,7 +54,7 @@ main{max-width:620px;padding:24px 17px 105px;margin:auto}.view{display:none}.vie
 'use strict';
 const el=id=>document.getElementById(id);
 const $all=q=>Array.from(document.querySelectorAll(q));
-let db=null,walks=[],session=null,watch=null,map=null,traceLayer=null,marker=null,selectedMin=30,selectedMode='探索',currentTab='home',lastPoint=null,tick=null;
+let db=null,walks=[],session=null,watch=null,map=null,traceLayer=null,marker=null,selectedMin=30,selectedMode='探索',currentTab='home',lastPoint=null,tick=null,centered=false;
 const missions=[{id:'time',title:'20分の寄り道',detail:'20分間歩いてみよう',xp:25,ok:w=>w.elapsed>=1200000},{id:'distance',title:'はじめての1キロ',detail:'1km以上移動してみよう',xp:40,ok:w=>w.distance>=1000},{id:'discovery',title:'小さな発見',detail:'散歩中に発見をひとつ記録',xp:30,ok:w=>w.discoveries.length>0},{id:'photo',title:'今日の一枚',detail:'発見に写真を残してみよう',xp:25,ok:w=>w.discoveries.some(d=>!!d.photo)}];
 const id=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random();
 function notice(x){const e=el('toast');e.textContent=x;e.classList.add('show');clearTimeout(notice.timer);notice.timer=setTimeout(()=>e.classList.remove('show'),4800)}
@@ -73,7 +73,7 @@ function switchTab(tab){currentTab=tab;$all('.view').forEach(v=>v.classList.togg
 function initMap(){if(map)return;if(!window.L){el('gps-notice').textContent='地図を読み込めなかったよ。ネット接続を確認してね。';return}
  map=L.map('map').setView([36.3,138.2],5);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'}).addTo(map)}
 function drawTrack(){if(!map)return;if(traceLayer){map.removeLayer(traceLayer);traceLayer=null}if(session&&session.track.length){let groups=[],group=[];for(const p of session.track){if(p.gap&&group.length){groups.push(group);group=[]}group.push([p.lat,p.lng])}if(group.length)groups.push(group);traceLayer=L.polyline(groups,{color:'#c9aa72',weight:5}).addTo(map)}}
-function showPosition(p){if(!map)return;const latlng=[p.lat,p.lng];if(marker)marker.setLatLng(latlng);else marker=L.circleMarker(latlng,{radius:7,color:'white',weight:3,fillColor:'#3886c5',fillOpacity:1}).addTo(map)}
+function showPosition(p){if(!map)return;const latlng=[p.lat,p.lng];if(marker)marker.setLatLng(latlng);else marker=L.circleMarker(latlng,{radius:7,color:'white',weight:3,fillColor:'#3886c5',fillOpacity:1}).addTo(map);if(!centered){map.setView(latlng,16);centered=true}}
 function geoError(e){el('gps-notice').textContent=e.code===1?'位置情報が許可されていないよ。ブラウザーの設定を確認してね。':'GPSを取得できなかったよ。屋外で再試行してね。'}
 function addGPS(raw){const c=raw.coords,p={lat:c.latitude,lng:c.longitude,at:raw.timestamp||Date.now(),acc:c.accuracy};if(!isFinite(p.lat)||!isFinite(p.lng))return;lastPoint=p;showPosition(p);if(!session||session.status!=='walking')return;if(p.acc>65){el('gps-notice').textContent='現在GPS精度が低いので、この地点は距離に足していないよ。';return}
  const prev=session.track.at(-1);if(prev&&p.at<=prev.at)return;if(!prev||session.gap){p.gap=!!session.gap;session.gap=false;session.track.push(p)}else{const dt=(p.at-prev.at)/1000,meters=hav(prev,p);if(dt>35){p.gap=true;session.track.push(p)}else if(meters>3&&meters/dt<6&&dt>0){session.distance+=meters;session.track.push(p)}else if(meters<=3&&dt>0){session.track.push(p)}}if(session.track.length>18000)session.track.shift();drawTrack();updateLive()}
@@ -98,5 +98,6 @@ el('add-discovery').onclick=()=>el('discovery-dialog').showModal();el('disc-canc
 el('discovery-form').onsubmit=async e=>{e.preventDefault();if(!session)return;try{const photo=await photoData(el('disc-image').files[0]);session.discoveries.push({title:el('disc-title').value.trim().slice(0,80),type:el('disc-type').value,note:el('disc-note').value.trim().slice(0,600),photo,lat:lastPoint?.lat||null,lng:lastPoint?.lng||null,at:Date.now()});el('discovery-dialog').close();el('discovery-form').reset();updateLive();renderMissions();notice('発見を記録したよ！')}catch(err){notice(err.message)}};
 el('detail-close').onclick=()=>el('detail-dialog').close();el('export').onclick=exportBackup;el('import').onchange=e=>importBackup(e.target.files[0]);tick=setInterval(()=>{updateLive();renderMissions()},1000);render();updateLive()}
 init();
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});
 </script>
 </body></html>
